@@ -75,7 +75,7 @@ header.top { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-it
 /* Tree */
 .tree-scroll {
   overflow: auto; background: var(--sheet); border: 1px solid var(--line); border-radius: 14px;
-  max-height: min(78vh, 980px); position: relative; overscroll-behavior: contain;
+  height: min(78vh, 980px); position: relative; overscroll-behavior: contain;
 }
 .tree { position: relative; transform-origin: 0 0; }
 .tree-sizer { position: relative; overflow: hidden; }
@@ -87,7 +87,7 @@ header.top { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-it
 .tree-tools .full-btn { background: var(--accent); border-color: var(--accent); color: var(--card); }
 .tree-tools .full-btn:hover { color: var(--card); opacity: .9; }
 .tree-box.full { position: fixed; inset: 0; z-index: 15; background: var(--sheet); display: flex; flex-direction: column; }
-.tree-box.full .tree-scroll { flex: 1; max-height: none; border: 0; border-radius: 0; }
+.tree-box.full .tree-scroll { flex: 1; max-height: none; height: auto; border: 0; border-radius: 0; }
 .tree-box.full .tree-tools { position: absolute; top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); z-index: 2; margin: 0; }
 .tree-box.full .full-btn { box-shadow: 0 2px 10px rgba(0,0,0,.25); }
 .tree-scroll { touch-action: pan-x pan-y; }
@@ -276,15 +276,9 @@ footer { margin-top: 48px; font-size: 13px; color: var(--muted); max-width: 75ch
     <span><i class="dot b-fayz"></i>Файзулины</span>
   </div>
   <p class="hint" id="scrollHint">Дерево можно прокручивать, а приближать и отдалять — двумя пальцами, как фото.</p>
-  <p class="hint" id="stepsHint" hidden>Начинается с самого старшего известного предка. Нажмите на ребёнка или родителя, чтобы перейти к нему, на большую карточку — чтобы прочитать историю. Кнопка «Назад» возвращает на шаг.</p>
 </div>
 
 <div class="wrap">
-  <div class="switch" role="tablist" aria-label="Как показывать дерево">
-    <button type="button" role="tab" id="modeSteps" data-mode="steps">По шагам</button>
-    <button type="button" role="tab" id="modeTree" data-mode="tree">Всё дерево</button>
-  </div>
-  <div class="steps" id="steps" hidden></div>
   <div class="tree-box" id="treeBox">
     <div class="tree-tools">
       <button type="button" id="fullBtn" class="full-btn">На весь экран</button>
@@ -671,83 +665,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closePerson(
 buildTree();
 buildGens();
 
-// Step-by-step view
-const stepsEl = document.getElementById("steps");
-const yrs = p => p.yr || (p.living ? "" : "годы неизвестны");
-function mini(id) {
-  const p = P[id];
-  return `<button type="button" class="mini ${p.lvl}" data-focus="${id}">
-    <span class="who">${esc(p.rel)}</span>
-    <span class="nm">${esc(p.name)} ${esc(p.sur)}</span>
-    <span class="yr"><span class="dot b-${p.br}"></span>${esc(yrs(p))}</span></button>`;
-}
-function group(label, ids, empty) {
-  if (!ids.length && !empty) return "";
-  return `<div><div class="f-lbl">${label}</div><div class="f-grid">${ids.length ? ids.map(mini).join("") : `<div class="f-empty">${empty}</div>`}</div></div>`;
-}
-let trail = [];
-function focusTo(id) {
-  const i = trail.indexOf(id);
-  if (i >= 0) trail = trail.slice(0, i + 1); else trail.push(id);
-  renderFocus(id, true);
-}
-function renderFocus(id, scroll) {
-  const p = P[id], r = relatives(id);
-  const prev = trail.length > 1 ? P[trail[trail.length - 2]] : null;
-  const nav = trail.length > 1 ? `
-    <div class="f-nav">
-      <button type="button" class="back" data-back="1">← Назад: ${esc(prev.name)}</button>
-      <div class="crumbs">${trail.map((t, i) => i === trail.length - 1
-        ? `<span class="cur">${esc(P[t].name)}</span>`
-        : `<button type="button" data-crumb="${i}">${esc(P[t].name)}</button><span class="sep">›</span>`).join("")}</div>
-    </div>` : "";
-  stepsEl.innerHTML = `${nav}
-    ${group("Родители", r.parents, "Родители пока неизвестны")}
-    <div class="f-down"></div>
-    <button type="button" class="f-main ${p.lvl}${p.me ? " me" : ""}" data-open="${id}">
-      <span>
-        <span class="rel"><span class="dot b-${p.br}"></span>${esc(p.rel)}</span>
-        <span class="fnm">${esc(p.name)} ${esc(p.sur)}</span>
-        <span class="dates">${esc(p.yr || (p.living ? "" : "Годы жизни неизвестны"))}</span>
-        <span class="go">Читать историю →</span>
-      </span>
-      ${p.photo ? `<img src="${VALI_PHOTO}" alt="">` : ""}
-    </button>
-    ${group(r.spouses.length > 1 ? "Супруги" : "Супруг(а)", r.spouses)}
-    ${group("Братья и сёстры", r.sibs)}
-    <div class="f-down"></div>
-    ${group("Дети", r.kids, "Детей в дереве нет")}
-    <div><div class="f-lbl">Быстрый переход</div><div class="jump">${["mg", "va", "fr", "gn", "fd", "ru"].filter(x => x !== id).map(chipFocus).join("")}</div></div>`;
-  if (scroll) stepsEl.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-}
-function chipFocus(id) {
-  const p = P[id];
-  return `<button type="button" class="chip" data-focus="${id}"><span class="dot b-${p.br}"></span>${esc(p.name)} <small>${esc(p.rel.toLowerCase())}</small></button>`;
-}
-stepsEl.addEventListener("click", e => {
-  const f = e.target.closest("[data-focus]");
-  if (f) { focusTo(f.dataset.focus); return; }
-  if (e.target.closest("[data-back]")) { trail.pop(); renderFocus(trail[trail.length - 1], true); return; }
-  const c = e.target.closest("[data-crumb]");
-  if (c) { trail = trail.slice(0, +c.dataset.crumb + 1); renderFocus(trail[trail.length - 1], true); return; }
-  const o = e.target.closest("[data-open]");
-  if (o) openPerson(o.dataset.open);
-});
-
 const sc = document.getElementById("treeScroll");
-function setMode(mode) {
-  const steps = mode === "steps";
-  stepsEl.hidden = !steps;
-  treeBox.hidden = steps;
-  if (steps && treeBox.classList.contains("full")) setFull(false);
-  document.getElementById("stepsHint").hidden = !steps;
-  document.getElementById("scrollHint").hidden = steps;
-  document.querySelectorAll(".switch button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.mode === mode)));
-  if (!steps) requestAnimationFrame(() => { sc.scrollLeft = Math.max(0, cx("va") * zoom - sc.clientWidth / 2); });
-  try { localStorage.setItem("treeMode", mode); } catch (e) {}
-}
-document.querySelectorAll(".switch button").forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
-
 const treeBox = document.getElementById("treeBox"), fullBtn = document.getElementById("fullBtn"), treeEl = document.getElementById("tree"), treeSizer = document.getElementById("treeSizer");
 let zoom = 1;
 // Zoom around a point on screen (pinch on touchscreen, trackpad, ctrl+wheel)
@@ -765,8 +683,11 @@ function setZoom(z) {
   const r = sc.getBoundingClientRect();
   zoomAt(z, r.left + sc.clientWidth / 2, r.top + sc.clientHeight / 2);
 }
+// Fit the tree to the height of the visible area: top and bottom generations touch the edges, sideways it scrolls
 function fitZoom() {
-  setZoom(Math.min(1, (sc.clientWidth - 4) / parseFloat(treeEl.style.width), (sc.clientHeight - 4) / parseFloat(treeEl.style.height)));
+  setZoom((sc.clientHeight - 2) / parseFloat(treeEl.style.height));
+  sc.scrollTop = 0;
+  sc.scrollLeft = Math.max(0, (sc.scrollWidth - sc.clientWidth) / 2);
 }
 function setFull(on) {
   treeBox.classList.toggle("full", on);
@@ -777,7 +698,7 @@ function setFull(on) {
     if (on && de.requestFullscreen && !document.fullscreenElement) de.requestFullscreen().catch(() => {});
     if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
   } catch (e) {}
-  setTimeout(() => on ? fitZoom() : setZoom(1), 80);
+  setTimeout(fitZoom, 80);
 }
 fullBtn.addEventListener("click", () => setFull(!treeBox.classList.contains("full")));
 sc.addEventListener("wheel", e => {
@@ -802,11 +723,8 @@ sc.addEventListener("gesturestart", e => { e.preventDefault(); gz = zoom; });
 sc.addEventListener("gesturechange", e => { e.preventDefault(); if (!pinch) zoomAt(gz * e.scale, e.clientX, e.clientY); });
 document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && treeBox.classList.contains("full")) setFull(false); });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && treeBox.classList.contains("full") && !document.querySelector("aside.panel:not([hidden])")) setFull(false); });
-trail = ["mg"];
-renderFocus("mg", false);
-let saved = null;
-try { saved = localStorage.getItem("treeMode"); } catch (e) {}
-setMode(saved || (window.innerWidth < 760 ? "steps" : "tree"));
+fitZoom();
+addEventListener("resize", () => { clearTimeout(window.__rz); window.__rz = setTimeout(fitZoom, 150); });
 
 const h = (location.hash || "").slice(1);
 if (P[h]) openPerson(h);
